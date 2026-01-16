@@ -1,1 +1,192 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+
+local LocalPlayer = Players.LocalPlayer
+local CommF = ReplicatedStorage.Remotes:WaitForChild("CommF_")
+local PlaceId = game.PlaceId
+
+local SETTINGS = {
+    AutoStore = true,
+    TeleportCooldown = 3,
+
+    ServerHopIfNoFruit = true,
+    NoFruitWaitTime = 20,
+
+    ShowGUI = true
+}
+
+
+do
+    local team = getgenv().SCP_CONFIG and getgenv().SCP_CONFIG.JoinTeam
+    if team == "Pirates" or team == "Marines" then
+        pcall(function()
+            CommF:InvokeServer("SetTeam", team)
+        end)
+    end
+end
+
+
+local function GetHRP()
+    local char = LocalPlayer.Character
+    return char and char:FindFirstChild("HumanoidRootPart")
+end
+
+
+local FruitFinder = {}
+
+function FruitFinder:IsDevilFruit(obj)
+    if not obj:IsA("Tool") then return false end
+    if not obj:FindFirstChild("Handle") then return false end
+    if obj.ToolTip ~= "Devil Fruit" then return false end
+    if not obj:IsDescendantOf(workspace) then return false end
+    return true
+end
+
+function FruitFinder:GetAll()
+    local fruits = {}
+    for _, v in ipairs(workspace:GetDescendants()) do
+        if self:IsDevilFruit(v) then
+            table.insert(fruits, v)
+        end
+    end
+    return fruits
+end
+
+function FruitFinder:GetClosest()
+    local hrp = GetHRP()
+    if not hrp then return nil end
+
+    local closest, dist = nil, math.huge
+    for _, fruit in ipairs(self:GetAll()) do
+        local d = (hrp.Position - fruit.Handle.Position).Magnitude
+        if d < dist then
+            closest = fruit
+            dist = d
+        end
+    end
+
+    return closest
+end
+
+
+local function StoreFruit()
+    pcall(function()
+        CommF:InvokeServer("StoreFruit")
+    end)
+end
+
+
+local function TeleportToFruit(fruit)
+    local hrp = GetHRP()
+    if not hrp or not fruit then return end
+    hrp.CFrame = fruit.Handle.CFrame * CFrame.new(0, 2, 0)
+end
+
+
+local visited = {}
+
+local function ServerHop()
+    local servers = {}
+    local cursor = ""
+
+    repeat
+        local url = string.format(
+            "https://games.roblox.com/v1/games/%d/servers/Public?limit=100%s",
+            PlaceId,
+            cursor ~= "" and "&cursor=" .. cursor or ""
+        )
+
+        local data = HttpService:JSONDecode(game:HttpGet(url))
+
+        for _, s in ipairs(data.data) do
+            if s.playing < s.maxPlayers and not visited[s.id] then
+                table.insert(servers, s.id)
+            end
+        end
+
+        cursor = data.nextPageCursor or ""
+    until #servers > 0 or cursor == ""
+
+    if #servers > 0 then
+        local id = servers[math.random(#servers)]
+        visited[id] = true
+        TeleportService:TeleportToPlaceInstance(PlaceId, id, LocalPlayer)
+    end
+end
+
+
+local processed = {}
+local lastTP = 0
+local noFruitStart = tick()
+
+task.spawn(function()
+    while task.wait(1) do
+        local fruits = FruitFinder:GetAll()
+
+        if #fruits == 0 then
+            if SETTINGS.ServerHopIfNoFruit and tick() - noFruitStart >= SETTINGS.NoFruitWaitTime then
+                ServerHop()
+                task.wait(5)
+            end
+        else
+            noFruitStart = tick()
+        end
+
+        local fruit = FruitFinder:GetClosest()
+        if fruit and not processed[fruit] and tick() - lastTP >= SETTINGS.TeleportCooldown then
+            processed[fruit] = true
+            TeleportToFruit(fruit)
+            lastTP = tick()
+
+            task.wait(0.4)
+            if SETTINGS.AutoStore then
+                StoreFruit()
+            end
+        end
+    end
+end)
+
+if SETTINGS.ShowGUI then
+    local gui = Instance.new("ScreenGui", LocalPlayer.PlayerGui)
+    gui.Name = "SCP_DEVIL_FRUIT_GUI"
+
+    local frame = Instance.new("Frame", gui)
+    frame.Size = UDim2.fromScale(0.34, 0.3)
+    frame.Position = UDim2.fromScale(0.5, 0.5)
+    frame.AnchorPoint = Vector2.new(0.5, 0.5)
+    frame.BackgroundColor3 = Color3.fromRGB(15,15,20)
+    frame.BorderSizePixel = 0
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 22)
+
+    local title = Instance.new("TextLabel", frame)
+    title.Size = UDim2.new(1,0,0,50)
+    title.Text = " SCP HUB —  AUTO FRUIT FINDER"
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 22
+    title.TextColor3 = Color3.fromRGB(255,80,80)
+    title.BackgroundTransparency = 1
+
+    local status = Instance.new("TextLabel", frame)
+    status.Position = UDim2.new(0,20,0,60)
+    status.Size = UDim2.new(1,-40,1,-80)
+    status.Font = Enum.Font.Gotham
+    status.TextSize = 16
+    status.TextWrapped = true
+    status.TextYAlignment = Top
+    status.TextColor3 = Color3.new(1,1,1)
+    status.BackgroundTransparency = 1
+
+    RunService.RenderStepped:Connect(function()
+        local count = #FruitFinder:GetAll()
+        status.Text =
+            "Devil Fruit Finder : ACTIVE\n" ..
+            "Auto Store : ENABLED\n" ..
+            "Team : " .. tostring(getgenv().SCP_CONFIG.JoinTeam) .. "\n" ..
+            "Fruit Found : " .. (count > 0 and "YES" or "NO") .. "\n" ..
+            "Server Hop : ENABLED"
+    end)
+end
 
