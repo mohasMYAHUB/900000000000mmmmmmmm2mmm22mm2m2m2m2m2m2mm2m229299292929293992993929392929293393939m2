@@ -1,0 +1,32 @@
+local Fluent = loadstring(game:HttpGet("https://raw.githubusercontent.com/Moha-space/FLUENT-V2-PLUS-/refs/heads/main/Library"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "   S  C  P  H   U  B || ESCAPE  THE TSUNAMI ",
+    SubTitle = "  by moha",
+    Search = false,
+    Icon = "rbxassetid://135671141026630",
+    TabWidth = 120,
+    Size = UDim2.fromOffset(430, 320),
+    Acrylic = true,
+    Theme = "Midnight",
+    MinimizeKey = Enum.KeyCode.LeftControl,
+
+    UserInfo = true,
+    UserInfoTop = false,
+    UserInfoTitle = game.Players.LocalPlayer.DisplayName,
+    UserInfoSubtitle = "User",
+    UserInfoSubtitleColor = Color3.fromRGB(71, 123, 255)
+})
+
+Fluent:CreateMinimizer({
+    Icon = "rbxassetid://135671141026630",
+    Size = UDim2.fromOffset(60, 60),
+    Position = UDim2.new(0, 710, 0, 24),
+    Acrylic = true,
+    Corner = 10,
+    Transparency = 1,
+    Draggable = false,
+    Visible = true
+})
